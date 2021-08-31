@@ -50,6 +50,7 @@ from .role import Role
 from .enums import ChannelType, try_enum, Status
 from . import utils
 from .flags import ApplicationFlags, Intents, MemberCacheFlags
+from .appcommands import CommandHandler
 from .object import Object
 from .invite import Invite
 from .integrations import _integration_factory
@@ -223,6 +224,8 @@ class ConnectionState:
         self._activity: Optional[ActivityPayload] = activity
         self._status: Optional[str] = status
         self._intents: Intents = intents
+
+        self._appcommands: CommandHandler = CommandHandler()
 
         if not intents.members or cache_flags._empty:
             self.store_user = self.create_user  # type: ignore
@@ -704,6 +707,9 @@ class ConnectionState:
             custom_id = interaction.data['custom_id']  # type: ignore
             component_type = interaction.data['component_type']  # type: ignore
             self._view_store.dispatch(component_type, custom_id, interaction)
+        if data['type'] == 2:  # appcommand
+            # TODO: get this pushed through client._schedule_event
+            asyncio.create_task(self._appcommands.handle(interaction), name='discord.py: appcommands')
 
         self.dispatch('interaction', interaction)
 

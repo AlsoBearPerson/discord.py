@@ -1044,6 +1044,23 @@ class Client:
         _log.debug('%s has successfully been registered as an event', coro.__name__)
         return coro
 
+    # Decorator to mark top-level appcommand handlers
+    def appcommand(
+        self,
+        *args, **kwargs
+    ):
+        return self._connection._appcommands.command(*args, **kwargs)
+
+    # Add and remove pre-cooked commands, intended for Cog usage
+    def add_appcommand(self, appcmd_data):
+        self._connection._appcommands.add_command(appcmd_data)
+    def remove_appcommand(self, appcmd_data):
+        self._connection._appcommands.remove_command(appcmd_data)
+
+    async def install_appcommands_to_guild(self, guildid):
+        await self._connection._appcommands.install_to_guild(
+            self, guildid)
+
     async def change_presence(
         self,
         *,
