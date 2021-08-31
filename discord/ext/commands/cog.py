@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import inspect
 import discord.utils
+from discord import appcommands
 
 from typing import Any, Callable, ClassVar, Dict, Generator, List, Optional, TYPE_CHECKING, Tuple, TypeVar, Type
 
@@ -121,6 +122,7 @@ class CogMeta(type):
 
         commands = {}
         listeners = {}
+        appcmds = []
         no_bot_cog = 'Commands or listeners must not start with cog_ or bot_ (in method {0.__name__}.{1})'
 
         new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
@@ -144,11 +146,17 @@ class CogMeta(type):
                     try:
                         getattr(value, '__cog_listener__')
                     except AttributeError:
-                        continue
+                        pass
                     else:
                         if elem.startswith(('cog_', 'bot_')):
                             raise TypeError(no_bot_cog.format(base, elem))
                         listeners[elem] = value
+                    try:
+                        getattr(value, '__cog_appcommand__')
+                    except AttributeError:
+                        pass
+                    else:
+                        appcmds.append(elem)
 
         new_cls.__cog_commands__ = list(commands.values()) # this will be copied in Cog.__new__
 
@@ -160,6 +168,7 @@ class CogMeta(type):
                 listeners_as_list.append((listener_name, listener.__name__))
 
         new_cls.__cog_listeners__ = listeners_as_list
+        new_cls.__cog_appcommands__ = appcmds
         return new_cls
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -186,6 +195,7 @@ class Cog(metaclass=CogMeta):
     __cog_name__: ClassVar[str]
     __cog_settings__: ClassVar[Dict[str, Any]]
     __cog_commands__: ClassVar[List[Command]]
+    __cog_appcommands__: ClassVar[List[str]]
     __cog_listeners__: ClassVar[List[Tuple[str, str]]]
 
     def __new__(cls: Type[CogT], *args: Any, **kwargs: Any) -> CogT:
@@ -314,6 +324,25 @@ class Cog(metaclass=CogMeta):
             # we need the type to be `staticmethod` for the metaclass
             # to pick it up but the metaclass unfurls the function and
             # thus the assignments need to be on the actual function
+            return func
+        return decorator
+
+    # Decorator to mark a coroutine as appcommand.
+    # Expects the same arguments as appcommands.CommandData.
+    @classmethod
+    def appcommand(cls, *args, **kwargs) -> Callable[[FuncT], FuncT]:
+        def decorator(func):
+            actual = func
+            if isinstance(actual, staticmethod):
+                actual = actual.__func__
+            if not inspect.iscoroutinefunction(actual):
+                raise TypeError('Appcommand function must be a coroutine function.')
+            # We instantiate but throw away CommandData, as an el-cheapo
+            # syntax check to ensure our args/kwargs are sane.
+            appcommands.CommandData(actual, *args, **kwargs)
+            # We then stash the args/kwargs, so we can later rebuild the proper
+            # CommandData from the bound method.
+            actual.__cog_appcommand__ = (args, kwargs)
             return func
         return decorator
 
@@ -447,6 +476,12 @@ class Cog(metaclass=CogMeta):
         for name, method_name in self.__cog_listeners__:
             bot.add_listener(getattr(self, method_name), name)
 
+        for name in self.__cog_appcommands__:
+            method = getattr(self, name)
+            # TODO: Does this need poking down to the underlying function?
+            args, kwargs = method.__cog_appcommand__
+            bot.add_appcommand(appcommands.CommandData(method, *args, **kwargs))
+
         return self
 
     def _eject(self, bot: BotBase) -> None:
@@ -459,6 +494,11 @@ class Cog(metaclass=CogMeta):
 
             for _, method_name in self.__cog_listeners__:
                 bot.remove_listener(getattr(self, method_name))
+
+            for name in self.__cog_appcommands__:
+                method = getattr(self, name)
+                args, kwargs = method.__cog_appcommand__
+                bot.remove_appcommand(appcommands.CommandData(method, *args, **kwargs))
 
             if cls.bot_check is not Cog.bot_check:
                 bot.remove_check(self.bot_check)
