@@ -31,6 +31,7 @@ OPT_TYPE_NUMBER = 10
 class CommandHandler:
   def __init__(self):
     self.handlers = {}  # map[(name, subcom_group, subcom) ->  CommandData]
+    self.filters = []
 
   def add_command(self, data):
     k = data.to_key()
@@ -43,6 +44,9 @@ class CommandHandler:
     if k not in self.handlers:
       raise ValueError(F"Unmatched command unregistration for {k!r}")
     del self.handlers[k]
+
+  def add_filter(self, filter_fn):
+    self.filters.append(filter_fn)
 
   def command(self, *args, **kwargs):
     def decorate(fn):
@@ -69,6 +73,9 @@ class CommandHandler:
     if not interaction.data.get('type') == COMMAND_TYPE_CHAT_INPUT:
       log.debug("Not handling interaction of non-chatinput type")
       return
+    for filter_fn in self.filters:
+      if not filter_fn(interaction):
+        return
 
     try:
       name = interaction.data.get('name')

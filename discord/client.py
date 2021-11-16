@@ -1057,6 +1057,14 @@ class Client:
     def remove_appcommand(self, appcmd_data):
         self._connection._appcommands.remove_command(appcmd_data)
 
+    # Add a filter function to appcommands processing.
+    # Will be invoked with the interaction, and processing will only continue
+    # if the filter returns true-ish, else the interaction is ignored.
+    # Use in sharded/multihomed setups where otherwise you would have multiple
+    # bot processes trying to respond to the same interaction.
+    def add_appcommand_filter(self, filter_fn):
+        self._connection._appcommands.add_filter(filter_fn)
+
     async def install_appcommands_to_guild(self, guildid):
         await self._connection._appcommands.install_to_guild(
             self, guildid)
