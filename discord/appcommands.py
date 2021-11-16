@@ -195,6 +195,7 @@ class CommandData:
     result = []
     for opt in self.options:
       result.append(opt.to_dict())
+    return result
 
   async def invoke(self, interaction, options):
     cooked_options = self.parse_option_values(interaction, options)
