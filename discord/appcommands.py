@@ -276,6 +276,7 @@ class UserOpt(OptBase):
     super().__init__(OPT_TYPE_USER, *args, **kwargs)
 
   def parse(self, value, interaction):
+    value = int(value)
     # TODO: Handle cache misses and non-guild messages
     return interaction.guild.get_member(value)
 
@@ -285,6 +286,7 @@ class ChannelOpt(OptBase):
     super().__init__(OPT_TYPE_CHANNEL, *args, **kwargs)
 
   def parse(self, value, interaction):
+    value = int(value)
     return interaction.guild.get_channel(value)
 
 
@@ -293,6 +295,7 @@ class RoleOpt(OptBase):
     super().__init__(OPT_TYPE_ROLE, *args, **kwargs)
 
   def parse(self, value, interaction):
+    value = int(value)
     return interaction.guild.get_role(value)
 
 
@@ -301,5 +304,6 @@ class MentionableOpt(OptBase):
     super().__init__(OPT_TYPE_MENTIONABLE, *args, **kwargs)
 
   def parse(self, value, interaction):
+    value = int(value)
     return (interaction.guild.get_member(value) or
             interaction.guild.get_role(value))
